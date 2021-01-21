@@ -13,19 +13,29 @@ namespace SoundAnalyzer
     /// </summary>
     public partial class MainWindow : Window
     {
+        private Dictionary<string, MMDevice> DevicesDictionary { get; set; }
+
         public MainWindow()
         {
             InitializeComponent();
 
-            // find output devices and save them to combo box
-            List<string> deviceNames = new List<string>();
-            var enumerator = new MMDeviceEnumerator();
-            foreach (var wasapi in enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.All))
-                if(wasapi.State == DeviceState.Active &&wasapi.DataFlow == DataFlow.Render)
-                    deviceNames.Add(wasapi.FriendlyName);
-            devicesComboBox.ItemsSource = deviceNames;
-            devicesComboBox.SelectedIndex = 0;
+            DevicesDictionary = new Dictionary<string, MMDevice>();
 
+            // find output devices and save them to combo box
+            var enumerator = new MMDeviceEnumerator();
+            foreach (var device in enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.All))
+                if(device.State == DeviceState.Active &&device.DataFlow == DataFlow.Render)
+                    DevicesDictionary.Add(device.FriendlyName, device);
+            devicesComboBox.ItemsSource = DevicesDictionary.Keys;
+            devicesComboBox.SelectedIndex = 0;
+        }
+
+        private void startAnalyzingButton_Click(object sender, RoutedEventArgs e)
+        {
+            string deviceName = (string)devicesComboBox.SelectedItem;
+            MMDevice device = DevicesDictionary[deviceName];
+
+            // TODO - commented code should be run on another thread
             /*MMDevice captureDevice = null;
             var capture = new WasapiLoopbackCapture(captureDevice);
             HttpClient Client = new HttpClient();

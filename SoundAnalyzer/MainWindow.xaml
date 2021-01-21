@@ -20,6 +20,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Label HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="0">Select output device:</Label>
-        <ComboBox x:Name="devicesComboBox" HorizontalAlignment="Left" VerticalAlignment="   Top" Width="200" Grid.Row="1"/>
+        <ComboBox x:Name="devicesComboBox" HorizontalAlignment="Left" VerticalAlignment="Top" Width="200" Grid.Row="1"/>
+        <Button x:Name="startAnalyzingButton" Click="startAnalyzingButton_Click" Grid.Row="2">Start analyzing</Button>
     </Grid>
 </Window>
