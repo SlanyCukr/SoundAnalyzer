@@ -17,21 +17,16 @@ namespace SoundAnalyzer
         {
             InitializeComponent();
 
-            MMDevice captureDevice = null;
+            // find output devices and save them to combo box
+            List<string> deviceNames = new List<string>();
             var enumerator = new MMDeviceEnumerator();
             foreach (var wasapi in enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.All))
-            {
-                if (wasapi.State == DeviceState.Active && wasapi.DataFlow == DataFlow.Render && wasapi.FriendlyName.Equals("Reproduktory (High Definition Audio Device)"))
-                {
-                    try
-                    {
-                        captureDevice = wasapi;
-                        Console.WriteLine($"{wasapi.FriendlyName} {wasapi.DeviceFriendlyName}");
-                    }
-                    catch (Exception) { }
-                }
-            }
+                if(wasapi.State == DeviceState.Active &&wasapi.DataFlow == DataFlow.Render)
+                    deviceNames.Add(wasapi.FriendlyName);
+            devicesComboBox.ItemsSource = deviceNames;
+            devicesComboBox.SelectedIndex = 0;
 
+            /*MMDevice captureDevice = null;
             var capture = new WasapiLoopbackCapture(captureDevice);
             HttpClient Client = new HttpClient();
             capture.DataAvailable += (s, a) =>
@@ -72,11 +67,11 @@ namespace SoundAnalyzer
                 // send data to LED strip
                 condensedBufferStr = condensedBufferStr.Remove(condensedBufferStr.Length - 1);
                 var encodedValues = new FormUrlEncodedContent(new Dictionary<string, string> { { "values", condensedBufferStr} });
-                Client.PostAsync("http://192.168.0.114:5000/real_time", encodedValues);
+                //Client.PostAsync("http://192.168.0.114:5000/real_time", encodedValues);
             };
             capture.StartRecording();
             while (capture.CaptureState != CaptureState.Stopped)
-                Thread.Sleep(25);
+                Thread.Sleep(25);*/
         }
     }
 }
