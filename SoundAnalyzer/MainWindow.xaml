@@ -7,7 +7,18 @@
         mc:Ignorable="d"
         Title="SoundAnalyzer" Height="450" Width="800">
     <Grid>
-        <ComboBox x:Name="devicesComboBox" HorizontalAlignment="Left" VerticalAlignment="Top" Width="200"/>
-
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Label HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="0">Select output device:</Label>
+        <ComboBox x:Name="devicesComboBox" HorizontalAlignment="Left" VerticalAlignment="Top" Width="200" Grid.Row="1"/>
     </Grid>
 </Window>
