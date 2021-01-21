@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Windows;
 using System.Net.Http;
+using System.Windows.Threading;
 
 namespace SoundAnalyzer
 {
@@ -14,17 +15,21 @@ namespace SoundAnalyzer
     public partial class MainWindow : Window
     {
         private Dictionary<string, MMDevice> DevicesDictionary { get; set; }
-
+        private WasapiLoopbackCapture CurrentCapture { get; set; }
+        private int LoopRunCount { get; set; }
+   
         public MainWindow()
         {
             InitializeComponent();
 
             DevicesDictionary = new Dictionary<string, MMDevice>();
+            LoopRunCount = 0;
+            CurrentCapture = null;
 
-            // find output devices and save them to combo box
+            // find output devices and display them in combo box
             var enumerator = new MMDeviceEnumerator();
             foreach (var device in enumerator.EnumerateAudioEndPoints(DataFlow.All, DeviceState.All))
-                if(device.State == DeviceState.Active &&device.DataFlow == DataFlow.Render)
+                if(device.State == DeviceState.Active && device.DataFlow == DataFlow.Render)
                     DevicesDictionary.Add(device.FriendlyName, device);
             devicesComboBox.ItemsSource = DevicesDictionary.Keys;
             devicesComboBox.SelectedIndex = 0;
@@ -32,15 +37,26 @@ namespace SoundAnalyzer
 
         private void startAnalyzingButton_Click(object sender, RoutedEventArgs e)
         {
+            // find device in dictionary
             string deviceName = (string)devicesComboBox.SelectedItem;
-            MMDevice device = DevicesDictionary[deviceName];
+            var selectedDevice = DevicesDictionary[deviceName];
 
-            // TODO - commented code should be run on another thread
-            /*MMDevice captureDevice = null;
-            var capture = new WasapiLoopbackCapture(captureDevice);
-            HttpClient Client = new HttpClient();
-            capture.DataAvailable += (s, a) =>
+            // stop recording if another capture was already assigned to this variable
+            if (CurrentCapture != null)
+                CurrentCapture.StopRecording();
+
+            CurrentCapture = new WasapiLoopbackCapture(selectedDevice);
+            CurrentCapture.DataAvailable += (s, a) =>
             {
+                // don't read data constantly
+                if (LoopRunCount < 25)
+                {
+                    LoopRunCount += 1;
+                    Thread.Sleep(1);
+                    return;
+                }
+                LoopRunCount = 0;
+
                 List<int> convertedValues = new List<int>();
                 var buffer = new WaveBuffer(a.Buffer);
 
@@ -60,12 +76,12 @@ namespace SoundAnalyzer
                 string condensedBufferStr = "";
 
                 int sum = 0;
-                for(int i = 0; i < convertedValues.Count; i++)
+                for (int i = 0; i < convertedValues.Count; i++)
                 {
                     sum += convertedValues[i];
 
                     // if we need to go to next index in condensedBuffer
-                    if(i % newCondensedBufferIndex == 0)
+                    if (i % newCondensedBufferIndex == 0)
                     {
                         var avgValue = sum / newCondensedBufferIndex;
                         condensedBuffer.Add(avgValue);
@@ -76,12 +92,9 @@ namespace SoundAnalyzer
 
                 // send data to LED strip
                 condensedBufferStr = condensedBufferStr.Remove(condensedBufferStr.Length - 1);
-                var encodedValues = new FormUrlEncodedContent(new Dictionary<string, string> { { "values", condensedBufferStr} });
-                //Client.PostAsync("http://192.168.0.114:5000/real_time", encodedValues);
+                //LedAPI.RealTime(condensedBufferStr);
             };
-            capture.StartRecording();
-            while (capture.CaptureState != CaptureState.Stopped)
-                Thread.Sleep(25);*/
+            CurrentCapture.StartRecording();
         }
     }
 }
