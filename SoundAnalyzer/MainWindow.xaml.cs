@@ -17,15 +17,21 @@ namespace SoundAnalyzer
     {
         private Dictionary<string, MMDevice> DevicesDictionary { get; set; }
         private WasapiLoopbackCapture CurrentCapture { get; set; }
-        private int LoopRunCount { get; set; }
+
+        private int[] PreviousSums { get; set; }
+        private int PreviousSumIndex { get; set; }
+        private int PreviousSum { get; set; }
    
         public MainWindow()
         {
             InitializeComponent();
 
+
             DevicesDictionary = new Dictionary<string, MMDevice>();
-            LoopRunCount = 0;
             CurrentCapture = null;
+            PreviousSums = new int[5] { 0, 0, 0, 0, 0 };
+            PreviousSumIndex = 0;
+            PreviousSum = 0;
 
             // find output devices and display them in combo box
             var enumerator = new MMDeviceEnumerator();
@@ -35,15 +41,15 @@ namespace SoundAnalyzer
             devicesComboBox.ItemsSource = DevicesDictionary.Keys;
             devicesComboBox.SelectedIndex = 0;
         }
-        private int[] FFT(int[] data)
+        private double[] FFT(float[] data)
         {
-            int[] fft = new int[data.Length];
+            double[] fft = new double[data.Length];
             System.Numerics.Complex[] fftComplex = new System.Numerics.Complex[data.Length];
             for (int i = 0; i < data.Length; i++)
                 fftComplex[i] = new System.Numerics.Complex(data[i], 0.0);
             Accord.Math.FourierTransform.FFT(fftComplex, Accord.Math.FourierTransform.Direction.Forward);
             for (int i = 0; i < data.Length; i++)
-                fft[i] = (int)(fftComplex[i].Magnitude);
+                fft[i] = fftComplex[i].Magnitude;
             return fft;
         }
 
@@ -64,74 +70,128 @@ namespace SoundAnalyzer
             CurrentCapture.DataAvailable += (s, a) =>
             {
                 // don't read data constantly
-                /*if (LoopRunCount < 2)
-                {
-                    LoopRunCount += 1;
-                    Thread.Sleep(1);
-                    return;
-                }
-                LoopRunCount = 0;*/
+                Thread.Sleep(5);
 
-                Thread.Sleep(10);
+                float[] interpretedValues = InterpretBytesAsFloat(a.Buffer);
 
-                int[] convertedValues = new int[(int)Math.Pow(2, 14)];
-                var buffer = new WaveBuffer(a.Buffer);
-
-                // interpret as 32 bit floating point audio
-                for (int index = 0; index < a.BytesRecorded / 4; index++)
-                {
-                    if (index >= (int)Math.Pow(2, 14))
-                        continue;
-
-                    var sample = buffer.FloatBuffer[index];
-
-                    // absolute value 
-                    if (sample < 0) sample = -sample;
-                    //int scaledValue = (int)(sample * 255);
-                    int scaledValue = (int)(sample * 255);
-                    convertedValues[index] = scaledValue;
-                }
-
-                var test = convertedValues.Max();
-
+                //float[] condensedInterpretedValues = CondenseArray(interpretedValues, (int)Math.Pow(2,14));
 
                 // fast fourier transformed values to extract different sound levels on different frequencies
-                var fftArr = FFT(convertedValues);
+                //var fftArr = FFT(condensedInterpretedValues);
 
-                List<int> condensedBuffer = new List<int>();
-                //int newCondensedBufferIndex = convertedValues.Count / (177);
-                int newCondensedBufferIndex = convertedValues.Length / 177;
+                /*int newCondensedBufferIndex = (fftArr.Length / 177) / 90;
                 string condensedBufferStr = "";
 
                 int sum = 0;
-                for (int i = 0; i < fftArr.Length; i++)
+                List<int> templist = new List<int>();
+                for (int i = 0; i < fftArr.Length / 90; i++)
                 {
-                    sum += fftArr[i];
-
+                    sum += (int)(fftArr[i] * 25500);
+                    templist.Add((int)(fftArr[i] * 25500));
                     // if we need to go to next index in condensedBuffer
                     if (i % newCondensedBufferIndex == 0 && i > 0)
                     {
                         var avgValue = sum / newCondensedBufferIndex;
+                        //var avgValue = templist.Max();// / (templist.Min() + 1);
 
                         /*for (int j = 0; j < 8; j++)
                         {
                             condensedBuffer.Add(avgValue);
                             condensedBufferStr += avgValue + ";";
-                        }*/
-                        condensedBuffer.Add(avgValue);
+                        }
                         condensedBufferStr += avgValue + ";";
                         sum = 0;
+                        templist.Clear();
+                    }
+                }*/
+                List<byte> values = new List<byte>();
+                
+                //int sum = (int)(interpretedValues.Sum() * 255) / (177 / 3);
+                int sum = (int)(interpretedValues.Sum() * 2550) / (177 / 3);
+                int tempSum = sum;
+
+                while (sum > 0)
+                {
+                    if (sum - 255 >= 0)
+                    {
+                        values.Add(255);
+                        sum -= 255;
+                    }
+                    else 
+                    {
+                        values.Add((byte)sum);
+                        sum -= sum;
                     }
                 }
 
+                int neededAmount = (sum >= 30000) ? 1000 : 5000;
+                //int neededAmount = 5000;
+                bool suddenChange = (tempSum - PreviousSum) >= neededAmount ? true : false;
+                PreviousSum = tempSum;
+
                 // send data to LED strip
-                if (condensedBufferStr != String.Empty)
+                if (values.Count != 0) 
                 {
-                    condensedBufferStr = condensedBufferStr.Remove(condensedBufferStr.Length - 1);
-                    LedAPI.RealTime(condensedBufferStr);
+                    LedAPI.RealTime(values.ToArray(), suddenChange);
                 }
+                else
+                    LedAPI.RealTime(new byte[0], false);
             };
             CurrentCapture.StartRecording();
+        }
+
+        /// <summary>
+        /// Interprets bytes from sound device as integers.
+        /// </summary>
+        /// <param name="bytes"></param>
+        /// <returns></returns>
+        private float[] InterpretBytesAsFloat(byte[] bytes)
+        {
+            float[] floats = new float[bytes.Length / 4];
+
+            var buffer = new WaveBuffer(bytes);
+
+            // interpret as 32 bit floating point audio
+            for (int index = 0; index < bytes.Length / 4; index++)
+            {
+                //if (index >= (int)Math.Pow(2, 14))
+                    //continue;
+
+                var sample = buffer.FloatBuffer[index];
+
+                // absolute value 
+                if (sample < 0) sample = -sample;
+                //int scaledValue = (int)(sample * 2550000);
+                floats[index] = sample;
+            }
+
+            return floats;
+        }
+
+        private float[] CondenseArray(float[] arr1, int arr2Length)
+        {
+            int nextIntIndex = (arr1.Length / arr2Length) + 1;
+            float[] arr2 = new float[arr2Length];
+
+            float sum = 0;
+            int arr2Index = 0;
+            for (int i = 0; i < arr1.Length; i++)
+            {
+                sum += arr1[i];
+
+                // if we need to go to next index in condensedArray
+                if (i % nextIntIndex == 0 && i > 0)
+                {
+                    var avgValue = sum / nextIntIndex;
+
+                    arr2[arr2Index] = avgValue;
+
+                    arr2Index++;
+                    sum = 0;
+                }
+            }
+
+            return arr2;
         }
     }
 }

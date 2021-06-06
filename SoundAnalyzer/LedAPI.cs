@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,13 +10,18 @@ namespace SoundAnalyzer
 {
     static class LedAPI
     {
-        private static readonly HttpClient Client = new HttpClient();
+        private static readonly UdpClient Client = new UdpClient("192.168.0.106", 5001);
 
-        // TODO - IP of the server should be set in some sort of settings
-        public async static Task<HttpResponseMessage> RealTime(string condensedBuffer)
+        public static void RealTime(byte[] values, bool suddenChange)
         {
-            var encodedValues = new FormUrlEncodedContent(new Dictionary<string, string> { { "values", condensedBuffer } });
-            return await Client.PostAsync("http://192.168.0.114:5000/real_time", encodedValues);
+            byte header = (byte)values.Length;
+            header += (byte)(Convert.ToByte(suddenChange) << 7);
+
+            byte[] newValues = new byte[values.Length + 1];
+            newValues[0] = header;
+            values.CopyTo(newValues, 1);
+
+            Client.Send(newValues, values.Length + 1);
         }
     }
 }
