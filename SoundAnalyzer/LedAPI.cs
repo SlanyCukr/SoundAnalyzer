@@ -10,7 +10,7 @@ namespace SoundAnalyzer
 {
     static class LedAPI
     {
-        private static readonly UdpClient Client = new UdpClient("192.168.0.106", 5001);
+        private static readonly UdpClient Client = new UdpClient("192.168.100.50", 5001);
 
         public static void RealTime(byte[] values, bool suddenChange)
         {

@@ -107,9 +107,9 @@ namespace SoundAnalyzer
                 List<byte> values = new List<byte>();
                 
                 //int sum = (int)(interpretedValues.Sum() * 255) / (177 / 3);
-                int sum = (int)(interpretedValues.Sum() * 2550) / (177 / 3);
+                int sum = (int)(interpretedValues.Sum() * (2550 / 2)) / (177 / 8);
                 int tempSum = sum;
-
+                
                 while (sum > 0)
                 {
                     if (sum - 255 >= 0)
@@ -124,7 +124,7 @@ namespace SoundAnalyzer
                     }
                 }
 
-                int neededAmount = (sum >= 30000) ? 1000 : 5000;
+                int neededAmount = (sum >= 30000) ? 30000 : 100000;
                 //int neededAmount = 5000;
                 bool suddenChange = (tempSum - PreviousSum) >= neededAmount ? true : false;
                 PreviousSum = tempSum;
@@ -132,7 +132,7 @@ namespace SoundAnalyzer
                 // send data to LED strip
                 if (values.Count != 0) 
                 {
-                    LedAPI.RealTime(values.ToArray(), suddenChange);
+                    LedAPI.RealTime(values.ToArray(), false);
                 }
                 else
                     LedAPI.RealTime(new byte[0], false);
